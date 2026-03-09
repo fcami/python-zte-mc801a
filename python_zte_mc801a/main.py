@@ -445,5 +445,36 @@ def live(
         show_live(config, viz=viz)
 
 
+@app.command()
+def watchdog(
+    config_file: str = typer.Argument(
+        "watchdog.yml",
+        help="Path to watchdog YAML config file",
+    ),
+    interval: int = typer.Option(30, help="Check interval in seconds"),
+):
+    """Run a watchdog daemon that monitors router state and re-applies settings.
+
+    The config file (default: watchdog.yml) should contain:
+
+    \b
+        router_ip: 192.0.2.1
+        password: SECRET
+        network_mode: "4G"           # optional
+        lte_bands: [3, 7, 28]        # optional
+        nr5g_bands: [28, 78]         # optional
+        cell_lock:                    # optional
+          pci: 123
+          earfcn: 3350
+        dns:                          # optional
+          primary: "1.1.1.1"
+          secondary: "1.0.0.1"
+    """
+    from python_zte_mc801a.daemon import load_watchdog_config, run_daemon
+
+    cfg = load_watchdog_config(config_file)
+    run_daemon(cfg, interval=interval)
+
+
 if __name__ == "__main__":
     typer.run(live)
