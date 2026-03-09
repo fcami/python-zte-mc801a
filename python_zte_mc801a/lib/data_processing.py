@@ -89,9 +89,10 @@ def process_5g_data(data: dict) -> dict:
     """
     processed_data = {}
 
+    nr5g_pci = data.get("nr5g_pci", "")
     processed_data["PCI"] = {
         "desc": "PCI",
-        "str_value": f"{int(data['nr5g_pci'], base=16)}",
+        "str_value": str(int(nr5g_pci, 16)) if nr5g_pci else "",
     }
 
     processed_data["EARFCN"] = {
@@ -104,14 +105,16 @@ def process_5g_data(data: dict) -> dict:
         "str_value": f"{data['nr5g_action_band']}",
     }
 
+    rsrp = data.get("Z5g_rsrp", "")
     processed_data["RSRP"] = {
         "desc": "RSRP [Power]",
-        "str_value": f"{data['Z5g_rsrp']}dB",
+        "str_value": f"{rsrp}dB" if rsrp else "",
     }
 
+    sinr = data.get("Z5g_SINR", "")
     processed_data["SNR"] = {
         "desc": "SNR [Noise]",
-        "str_value": f"{data['Z5g_SINR']}dB",
+        "str_value": f"{sinr}dB" if sinr else "",
     }
 
     return processed_data
