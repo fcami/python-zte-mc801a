@@ -22,6 +22,7 @@ termplotlib = "^0.3.9"
 
 [tool.poetry.group.dev.dependencies]
 black = {version = "^23.1a1", allow-prereleases = true}
+flake8 = "^7.0"
 pylint = "^3.0"
 
 [tool.pylint.main]
@@ -39,7 +40,7 @@ disable = [
 ]
 
 [tool.pylint.format]
-max-line-length = 100
+max-line-length = 140
 
 [tool.pylint.design]
 max-args = 8

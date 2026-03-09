@@ -47,7 +47,8 @@ def setup():
 
     print(
         Padding(
-            "🚨 Your password will be stored as plain-text in `settings.yml`. You can alternatively pass your password directly to the various commands.",
+            "🚨 Your password will be stored as plain-text in `settings.yml`."
+            " You can alternatively pass your password directly to the various commands.",
             (1, 1),
         )
     )
@@ -66,7 +67,8 @@ def setup():
 
 
 @app.command(
-    help="Try to connect to a target 5G PCI by alternatively setting 5G bands to one of two sets. Useful when a certain PCI is preferred over another (e.g. for performance reason)"
+    help="Try to connect to a target 5G PCI by alternating between two band sets."
+    " Useful when a certain PCI is preferred over another (e.g. for performance)."
 )
 def force_5g_pci(
     target_pci: str = typer.Argument(..., help="PCI to target", metavar="TEXT"),

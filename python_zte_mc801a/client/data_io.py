@@ -1,38 +1,32 @@
-import yaml
 import json
-from pathlib import Path
-from datetime import datetime
 import logging
+from datetime import datetime
+from pathlib import Path
+
+import yaml
 
 log = logging.getLogger("rich")
 
 
 def check_config(router_ip: str, password: str) -> dict:
-    setting_file_config = False
-    cli_argument_config = False
-
-    config = None
-
     if router_ip and password:
         log.info("Configuration from CLI options")
         return {"router_ip": router_ip, "password": password}
-    elif router_ip or password:
+    if router_ip or password:
         log.info("Both router-ip and password CLI options must be provided")
-    elif Path("settings.yml").exists():
+        return None
+    if Path("settings.yml").exists():
         with open("settings.yml", "r") as f:
             config = yaml.load(f, Loader=yaml.SafeLoader)
-
         if (
-            (config is not None)
-            & ("password" in config.keys())
-            & ("router_ip" in config.keys())
+            config is not None
+            and "password" in config
+            and "router_ip" in config
         ):
-            log.info(f"Configuration from file: {Path('settings.json')}")
-            setting_file_config = True
+            log.info("Configuration from file: settings.yml")
             return config
     else:
-        log.error(f"Could not locate settings file or CLI settings parameters.")
-
+        log.error("Could not locate settings file or CLI settings parameters.")
     return None
 
 

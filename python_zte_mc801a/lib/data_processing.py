@@ -91,7 +91,7 @@ def process_5g_data(data: dict) -> dict:
 
     processed_data["PCI"] = {
         "desc": "PCI",
-        "str_value": f"{int(data['nr5g_pci'],base=16)}",
+        "str_value": f"{int(data['nr5g_pci'], base=16)}",
     }
 
     processed_data["EARFCN"] = {
@@ -186,7 +186,7 @@ def process_data_4g(data: dict) -> dict:
 
         processed_data["4G_PCI"] = {
             "desc": "PCI",
-            "str_value": f"{lock_str}{int(data['lte_pci'],base=16)}",
+            "str_value": f"{lock_str}{int(data['lte_pci'], base=16)}",
         }
     else:
         processed_data["4G_PCI"] = {"desc": "PCI", "str_value": ""}

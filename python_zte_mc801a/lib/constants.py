@@ -1,16 +1,22 @@
-ALL_5G_BANDS = "1,2,3,5,7,8,20,28,38,41,50,51,66,70,71,74,75,76,77,78,79,80,81,82,83,84"
+ALL_5G_BANDS = (
+    "1,2,3,5,7,8,20,28,38,41,50,51,"
+    "66,70,71,74,75,76,77,78,79,80,81,82,83,84"
+)
+
 
 # LTE band bitmask: bit (N-1) represents band N.
-# Verified from router JS (goformId=SET_NETWORK_BAND_LOCK, field lte_band_lock).
+# Verified from router JS (goformId=SET_NETWORK_BAND_LOCK).
 def lte_bands_to_mask(bands: list) -> str:
     """Convert a list of LTE band numbers to a hex bitmask string."""
     mask = sum(1 << (b - 1) for b in bands)
     return hex(mask)
 
+
 def lte_mask_to_bands(mask_str: str) -> list:
     """Convert a hex bitmask string to a list of LTE band numbers."""
     mask = int(mask_str, 16)
     return [i + 1 for i in range(64) if mask & (1 << i)]
+
 
 ALL_DATA_FIELDS = [
     "lte_pci",

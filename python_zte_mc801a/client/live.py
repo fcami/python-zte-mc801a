@@ -13,14 +13,6 @@ from python_zte_mc801a.client.data_io import load_data, persist_data
 from python_zte_mc801a.lib.helpers import get_processed_data, get_sms_data
 
 
-# with Progress(TextColumn("{task.description}"), BarColumn(), TextColumn("-{task.completed}db")) as progress:
-
-#     bar_4g = progress.add_task("[b]4G[/b] Signal Strength", total=130, completed=abs(int(data['lte_rsrp'])))
-#     bar_5g = progress.add_task("[b]5G[/b] Signal Strength", total=130, completed=abs(int(data['Z5g_rsrp'])))
-
-# layout['side'].update(progress)
-
-
 class LIVE_VISUALIZATIONS(str, Enum):
     POWER_5G = "power-5g"
     POWER_4G = "power-4g"
