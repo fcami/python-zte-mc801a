@@ -1,10 +1,12 @@
-import requests
-import hashlib
 import codecs
-from retry import retry
-from python_zte_mc801a.lib.data_processing import get_ad_value
-from python_zte_mc801a.lib.constants import ALL_DATA_FIELDS
+import hashlib
 import logging
+
+import requests
+from retry import retry
+
+from python_zte_mc801a.lib.constants import ALL_DATA_FIELDS
+from python_zte_mc801a.lib.data_processing import get_ad_value
 
 log = logging.getLogger("rich")
 
@@ -53,73 +55,45 @@ def get_auth_cookies(router_ip: str, user_password: str) -> dict:
     return r_login.cookies.get_dict()
 
 
-def get_signal_data(router_ip: str, auth_cookies: dict) -> dict:
-    """Retrieve router data related to signals
-
-    Args:
-        router_ip (str): IP (or hostname) of the router
-        auth_cookies (dict): Authentication cookies obtained using `get_auth_cookies`
-
-    Returns:
-        dict: Signal data dictionary (unprocessed)
-    """
-
-    r_data = requests.get(
-        f'http://{router_ip}/goform/goform_get_cmd_process?isTest=false&cmd={",".join(ALL_DATA_FIELDS)}&multi_data=1',
-        cookies=auth_cookies,
-        headers={f"referer": f"http://{router_ip}/"},
-    )
-
-    return r_data.json()
-
-
-def get_latest_sms_messages(router_ip, auth_cookies, n=3) -> list:
-    """Retrieve latest SMS messages
-
-    Args:
-        router_ip (_type_): IP (or hostname) of the router
-        auth_cookies (_type_): Authentication cookies obtained using `get_auth_cookies`
-        n (int, optional): Number of messages to retrieve. Defaults to 3.
-
-    Returns:
-        list: Dictionaries of messages
-    """
-    r_data = requests.get(
-        f"http://{router_ip}/goform/goform_get_cmd_process?isTest=false&cmd=sms_data_total&page=0&data_per_page=500&mem_store=1&tags=10&order_by=order+by+id+desc",
-        cookies=auth_cookies,
-        headers={f"referer": f"http://{router_ip}/"},
-    )
-
-    json_data = r_data.json()
-
-    messages = json_data["messages"]
-
-    if len(messages) > n:
-        messages = messages[0:n]
-
-    # Convert hex representation to ASCII
-    for index, msg in enumerate(messages):
-        messages[index]["content"] = str(
-            codecs.decode(msg["content"], "hex").replace(b"\x00", b""), "latin-1"
-        )
-
-    return messages
-
-
-def get_lte_band_lock(router_ip: str, auth_cookies: dict) -> dict:
-    """Read the current LTE band lock masks from the router.
-
-    Returns:
-        dict with keys 'lte_band_ext_1_64', 'lte_band_ext_65_128',
-        'lte_band_ext_129_192', 'lte_band_ext_193_256' (all hex strings)
-    """
+def _get_cmd(router_ip: str, auth_cookies: dict, fields: list) -> dict:
+    """Query the router for one or more fields. Returns the JSON response."""
     r = requests.get(
-        f"http://{router_ip}/goform/goform_get_cmd_process?isTest=false"
-        f"&cmd=lte_band_ext_1_64,lte_band_ext_65_128,lte_band_ext_129_192,lte_band_ext_193_256&multi_data=1",
+        f'http://{router_ip}/goform/goform_get_cmd_process'
+        f'?isTest=false&cmd={",".join(fields)}&multi_data=1',
         cookies=auth_cookies,
         headers={"referer": f"http://{router_ip}/"},
     )
     return r.json()
+
+
+def get_signal_data(router_ip: str, auth_cookies: dict) -> dict:
+    """Retrieve router data related to signals."""
+    return _get_cmd(router_ip, auth_cookies, ALL_DATA_FIELDS)
+
+
+def get_latest_sms_messages(router_ip: str, auth_cookies: dict, n: int = 3) -> list:
+    """Retrieve latest SMS messages, decoded from hex to text."""
+    r = requests.get(
+        f"http://{router_ip}/goform/goform_get_cmd_process?isTest=false"
+        f"&cmd=sms_data_total&page=0&data_per_page=500"
+        f"&mem_store=1&tags=10&order_by=order+by+id+desc",
+        cookies=auth_cookies,
+        headers={"referer": f"http://{router_ip}/"},
+    )
+    messages = r.json().get("messages", [])[:n]
+    for msg in messages:
+        msg["content"] = codecs.decode(
+            msg["content"], "hex"
+        ).replace(b"\x00", b"").decode("latin-1")
+    return messages
+
+
+def get_lte_band_lock(router_ip: str, auth_cookies: dict) -> dict:
+    """Read the current LTE band lock masks from the router."""
+    return _get_cmd(router_ip, auth_cookies, [
+        "lte_band_ext_1_64", "lte_band_ext_65_128",
+        "lte_band_ext_129_192", "lte_band_ext_193_256",
+    ])
 
 
 def set_lte_band(
@@ -202,12 +176,7 @@ NETWORK_MODES_REVERSE = {v: k for k, v in NETWORK_MODES.items()}
 
 def get_network_mode(router_ip: str, auth_cookies: dict) -> str:
     """Return the current network mode (BearerPreference value)."""
-    r = requests.get(
-        f"http://{router_ip}/goform/goform_get_cmd_process?isTest=false&cmd=net_select&multi_data=1",
-        cookies=auth_cookies,
-        headers={"referer": f"http://{router_ip}/"},
-    )
-    return r.json().get("net_select", "")
+    return _get_cmd(router_ip, auth_cookies, ["net_select"]).get("net_select", "")
 
 
 def set_network_mode(
