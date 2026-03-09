@@ -5,10 +5,13 @@ import logging
 import requests
 from retry import retry
 
-from python_zte_mc801a.lib.constants import ALL_DATA_FIELDS
+from python_zte_mc801a.lib.constants import ALL_DATA_FIELDS, lte_bands_to_mask
 from python_zte_mc801a.lib.data_processing import get_ad_value
 
 log = logging.getLogger("rich")
+
+# Default HTTP timeout in seconds for all router requests.
+REQUEST_TIMEOUT = 10
 
 
 @retry(tries=3, delay=2)
@@ -31,6 +34,7 @@ def get_auth_cookies(router_ip: str, user_password: str) -> dict:
         f"http://{router_ip}/goform/goform_get_cmd_process?isTest=false&cmd=LD",
         cookies={"stok": ""},
         headers={"referer": f"http://{router_ip}/"},
+        timeout=REQUEST_TIMEOUT,
     )
 
     # The password is hashed twice
@@ -44,13 +48,15 @@ def get_auth_cookies(router_ip: str, user_password: str) -> dict:
 
     # Login request
     r_login = requests.get(
-        f"http://{router_ip}/goform/goform_set_cmd_process?isTest=false&goformId=LOGIN&password={pwd}",
+        f"http://{router_ip}/goform/goform_set_cmd_process"
+        f"?isTest=false&goformId=LOGIN&password={pwd}",
         cookies={"stok": ""},
         headers={"referer": f"http://{router_ip}/"},
+        timeout=REQUEST_TIMEOUT,
     )
 
-    if (not "result" in r_login.json().keys()) or (r_login.json()["result"] != "0"):
-        raise Exception("Login unsuccessful")
+    if "result" not in r_login.json() or r_login.json()["result"] != "0":
+        raise ConnectionError("Login unsuccessful")
 
     return r_login.cookies.get_dict()
 
@@ -62,6 +68,7 @@ def _get_cmd(router_ip: str, auth_cookies: dict, fields: list) -> dict:
         f'?isTest=false&cmd={",".join(fields)}&multi_data=1',
         cookies=auth_cookies,
         headers={"referer": f"http://{router_ip}/"},
+        timeout=REQUEST_TIMEOUT,
     )
     return r.json()
 
@@ -79,6 +86,7 @@ def get_latest_sms_messages(router_ip: str, auth_cookies: dict, n: int = 3) -> l
         f"&mem_store=1&tags=10&order_by=order+by+id+desc",
         cookies=auth_cookies,
         headers={"referer": f"http://{router_ip}/"},
+        timeout=REQUEST_TIMEOUT,
     )
     messages = r.json().get("messages", [])[:n]
     for msg in messages:
@@ -103,8 +111,6 @@ def set_lte_band(
 
     Uses goformId=BAND_SELECT_EX with lte_band_ext_1_64.
     """
-    from python_zte_mc801a.lib.constants import lte_bands_to_mask
-
     if any(b > 64 for b in bands):
         if verbose:
             log.warning(f"Bands > 64 not supported, ignoring: {[b for b in bands if b > 64]}")
@@ -141,6 +147,7 @@ def _post_cmd(router_ip: str, auth_cookies: dict, data: dict) -> dict:
             "Referer": f"http://{router_ip}/",
             "X-Requested-With": "XMLHttpRequest",
         },
+        timeout=REQUEST_TIMEOUT,
     )
     return r.json()
 

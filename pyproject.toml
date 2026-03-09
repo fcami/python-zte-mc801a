@@ -22,6 +22,27 @@ termplotlib = "^0.3.9"
 
 [tool.poetry.group.dev.dependencies]
 black = {version = "^23.1a1", allow-prereleases = true}
+pylint = "^3.0"
+
+[tool.pylint.main]
+load-plugins = []
+
+[tool.pylint."messages control"]
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "R0903",  # too-few-public-methods
+    "R0917",  # too-many-positional-arguments (library API)
+    "W0511",  # fixme
+    "W1203",  # logging-fstring-interpolation (f-strings are fine)
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.design]
+max-args = 8
 
 [build-system]
 requires = ["poetry-core"]

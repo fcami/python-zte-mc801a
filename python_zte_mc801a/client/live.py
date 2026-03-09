@@ -1,17 +1,16 @@
+from datetime import datetime
+from enum import Enum
+from time import sleep
+
+import termplotlib as tpl
 from rich.console import Group
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
-from datetime import datetime
-from time import sleep
 
-from python_zte_mc801a.client.data_io import persist_data, load_data
+from python_zte_mc801a.client.data_io import load_data, persist_data
 from python_zte_mc801a.lib.helpers import get_processed_data, get_sms_data
-
-from enum import Enum
-
-import termplotlib as tpl
 
 
 # with Progress(TextColumn("{task.description}"), BarColumn(), TextColumn("-{task.completed}db")) as progress:

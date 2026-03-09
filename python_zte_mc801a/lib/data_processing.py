@@ -204,7 +204,10 @@ def process_data_4g(data: dict) -> dict:
     if len(data["lte_ca_pcell_bandwidth"]):
         processed_data["4G_BANDS"] = {
             "desc": "Bands",
-            "str_value": f"{data['lte_ca_pcell_band']} ({round(float(data['lte_ca_pcell_bandwidth']))}Mhz)",
+            "str_value": (
+                f"{data['lte_ca_pcell_band']}"
+                f" ({round(float(data['lte_ca_pcell_bandwidth']))}Mhz)"
+            ),
         }
     else:
         processed_data["4G_BANDS"] = {
