@@ -62,10 +62,10 @@ def process_ca_4g_data(data: dict) -> list:
     """
     ca_4g_processed_data = []
 
-    if len(data["lte_multi_ca_scell_info"]):
-        ca_4g = data["lte_multi_ca_scell_info"].split(";")
-
-        for chan in ca_4g:
+    if data["lte_multi_ca_scell_info"]:
+        for chan in data["lte_multi_ca_scell_info"].rstrip(";").split(";"):
+            if not chan:
+                continue
             chan_details = chan.split(",")
             ca_4g_processed_data.append(
                 [
