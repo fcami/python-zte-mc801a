@@ -233,33 +233,20 @@ def process_data_4g(data: dict) -> dict:
 
 
 def get_ad_value(raw_data: dict) -> str:
-    """Retrieve AD value for write operations
+    """Retrieve AD value for write operations.
+
+    The router JS computes: AD = SHA256(SHA256(wa_inner_version + cr_version) + RD)
+    (cookWithRequest is SHA256, confirmed from util.js on the router).
 
     Args:
-        data (dict): Raw data
+        raw_data (dict): Raw data containing wa_inner_version, cr_version, RD
 
     Returns:
-        str: AD value
+        str: AD value (hex digest)
     """
+    # The router's JS SHA256 outputs UPPERCASE hex (p=1 in util.js).
+    h1 = hashlib.sha256(
+        (raw_data["wa_inner_version"] + raw_data["cr_version"]).encode()
+    ).hexdigest().upper()
 
-    # data_to_request = [
-    #     "wa_inner_version",
-    #     "cr_version",
-    #     "RD",
-    # ]
-
-    # r_data = requests.get(
-    #     f"http://{router_ip}/goform/goform_get_cmd_process?cmd=wa_inner_version,cr_version,RD&multi_data=1",
-    #     cookies=auth_cookies,
-    #     headers={f"referer": f"http://{router_ip}/"},
-    # )
-
-    # raw_data = r_data.json()
-
-    m = hashlib.md5()
-    m.update((raw_data["wa_inner_version"] + raw_data["cr_version"]).encode())
-
-    m2 = hashlib.md5()
-    m2.update((m.hexdigest() + raw_data["RD"]).encode())
-
-    return m2.hexdigest()
+    return hashlib.sha256((h1 + raw_data["RD"]).encode()).hexdigest().upper()

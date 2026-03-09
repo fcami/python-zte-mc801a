@@ -106,48 +106,123 @@ def get_latest_sms_messages(router_ip, auth_cookies, n=3) -> list:
     return messages
 
 
+def get_lte_band_lock(router_ip: str, auth_cookies: dict) -> dict:
+    """Read the current LTE band lock masks from the router.
+
+    Returns:
+        dict with keys 'lte_band_ext_1_64', 'lte_band_ext_65_128',
+        'lte_band_ext_129_192', 'lte_band_ext_193_256' (all hex strings)
+    """
+    r = requests.get(
+        f"http://{router_ip}/goform/goform_get_cmd_process?isTest=false"
+        f"&cmd=lte_band_ext_1_64,lte_band_ext_65_128,lte_band_ext_129_192,lte_band_ext_193_256&multi_data=1",
+        cookies=auth_cookies,
+        headers={"referer": f"http://{router_ip}/"},
+    )
+    return r.json()
+
+
+def set_lte_band(
+    router_ip: str, auth_cookies: dict, bands: list, verbose: bool = False
+) -> bool:
+    """Lock LTE to the given list of band numbers (1-64).
+
+    Uses goformId=BAND_SELECT_EX with lte_band_ext_1_64.
+    """
+    from python_zte_mc801a.lib.constants import lte_bands_to_mask
+
+    if any(b > 64 for b in bands):
+        if verbose:
+            log.warning(f"Bands > 64 not supported, ignoring: {[b for b in bands if b > 64]}")
+        bands = [b for b in bands if b <= 64]
+
+    hex_str = lte_bands_to_mask(bands)[2:]  # strip "0x"
+    padded = "0x" + hex_str.zfill(19)
+
+    result = _post_cmd(router_ip, auth_cookies, {
+        "goformId": "BAND_SELECT_EX",
+        "lte_band_ext_1_64": padded,
+    })
+    ok = result.get("result") == "success"
+    if verbose:
+        if ok:
+            log.info(f"Successfully set LTE bands to {bands} (mask {padded})")
+        else:
+            log.error(f"Error setting LTE bands to {bands}: {result}")
+    return ok
+
+
+def _post_cmd(router_ip: str, auth_cookies: dict, data: dict) -> dict:
+    """POST a goform command with fresh AD. Returns the JSON response."""
+    raw_data = get_signal_data(router_ip=router_ip, auth_cookies=auth_cookies)
+    ad = get_ad_value(raw_data)
+    data["isTest"] = "false"
+    data["AD"] = ad
+    r = requests.post(
+        f"http://{router_ip}/goform/goform_set_cmd_process",
+        data=data,
+        cookies=auth_cookies,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Referer": f"http://{router_ip}/",
+            "X-Requested-With": "XMLHttpRequest",
+        },
+    )
+    return r.json()
+
+
 def set_5g_band(
     router_ip: str, auth_cookies: dict, bands: str, verbose: bool = False
 ) -> bool:
-    raw_data = get_signal_data(router_ip=router_ip, auth_cookies=auth_cookies)
-    ad = get_ad_value(raw_data)
-
-    headers = {
-        "Accept": "*/*",
-        "Accept-Language": "en-GB,en;q=0.9,f^r-FR;q=0.8,fr;q=0.7,en-US;q=0.6",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "Origin": "http://192.168.0.1",
-        "Pragma": "no-cache",
-        "Referer": "http://192.168.0.1/",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36 Edg/109.0.1518.70",
-        "X-Requested-With": "XMLHttpRequest",
-    }
-
-    request_data = {
-        "isTest": "false",
+    result = _post_cmd(router_ip, auth_cookies, {
         "goformId": "WAN_PERFORM_NR5G_BAND_LOCK",
         "nr5g_band_mask": bands,
-        "AD": ad,
-    }
-
-    r = requests.post(
-        f"http://{router_ip}/goform/goform_set_cmd_process",
-        data=request_data,
-        cookies=auth_cookies,
-        headers=headers,
-    )
-
-    if (
-        r.status_code == 200
-        and "result" in r.json().keys()
-        and r.json()["result"] == "success"
-    ):
-        if verbose:
+    })
+    ok = result.get("result") == "success"
+    if verbose:
+        if ok:
             log.info(f"Successfully set 5G bands to {bands}")
-        return True
-    else:
-        if verbose:
-            log.error(f"Error setting 5G band to {bands}: {r.content}")
-        return False
+        else:
+            log.error(f"Error setting 5G bands to {bands}: {result}")
+    return ok
+
+
+NETWORK_MODES = {
+    "5G+4G+3G": "WL_AND_5G",
+    "5G_NSA": "LTE_AND_5G",
+    "5G_SA": "Only_5G",
+    "4G+5G": "4G_AND_5G",
+    "4G+3G": "WCDMA_AND_LTE",
+    "4G": "Only_LTE",
+    "3G": "Only_WCDMA",
+}
+
+NETWORK_MODES_REVERSE = {v: k for k, v in NETWORK_MODES.items()}
+
+
+def get_network_mode(router_ip: str, auth_cookies: dict) -> str:
+    """Return the current network mode (BearerPreference value)."""
+    r = requests.get(
+        f"http://{router_ip}/goform/goform_get_cmd_process?isTest=false&cmd=net_select&multi_data=1",
+        cookies=auth_cookies,
+        headers={"referer": f"http://{router_ip}/"},
+    )
+    return r.json().get("net_select", "")
+
+
+def set_network_mode(
+    router_ip: str, auth_cookies: dict, mode: str, verbose: bool = False
+) -> bool:
+    """Set the network mode. mode is the BearerPreference value, e.g. 'Only_LTE'."""
+    result = _post_cmd(router_ip, auth_cookies, {
+        "goformId": "SET_BEARER_PREFERENCE",
+        "BearerPreference": mode,
+    })
+    ok = result.get("result") == "success"
+    if verbose:
+        label = NETWORK_MODES_REVERSE.get(mode, mode)
+        if ok:
+            log.info(f"Successfully set network mode to {label} ({mode})")
+        else:
+            log.error(f"Error setting network mode to {label}: {result}")
+    return ok
