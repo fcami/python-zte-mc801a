@@ -1,29 +1,26 @@
+import logging
+
 import typer
 import yaml
-
-from python_zte_mc801a.lib.data_processing import process_data
-from python_zte_mc801a.lib.router_requests import (
-    get_auth_cookies, get_signal_data, set_lte_band, get_lte_band_lock,
-    set_5g_band, set_network_mode, get_network_mode,
-    NETWORK_MODES, NETWORK_MODES_REVERSE,
-)
-from python_zte_mc801a.lib.constants import lte_mask_to_bands
-
-from python_zte_mc801a.lib.helpers import force_5g_pci_selection
-
-from python_zte_mc801a.client.live import show_live, LIVE_VISUALIZATIONS
+from rich.console import Console
+from rich.logging import RichHandler
+from rich.padding import Padding
+from rich.pretty import pprint
+from rich.prompt import Prompt
+from rich.table import Table
 
 from python_zte_mc801a.client.data_io import check_config
-
-from rich.pretty import pprint
-from rich.console import Console
-from rich.prompt import Prompt
-from rich.padding import Padding
-
-from python_zte_mc801a.lib.constants import ALL_5G_BANDS
-
-import logging
-from rich.logging import RichHandler
+from python_zte_mc801a.client.live import show_live, LIVE_VISUALIZATIONS
+from python_zte_mc801a.lib.constants import ALL_5G_BANDS, lte_mask_to_bands
+from python_zte_mc801a.lib.data_processing import process_data
+from python_zte_mc801a.lib.helpers import force_5g_pci_selection
+from python_zte_mc801a.lib.router_requests import (
+    get_auth_cookies, get_signal_data, get_network_info, get_device_info,
+    set_lte_band, get_lte_band_lock,
+    set_5g_band, set_network_mode,
+    set_dns, set_dns_auto, lock_cell, unlock_cell, reboot_device,
+    NETWORK_MODES, NETWORK_MODES_REVERSE,
+)
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -101,58 +98,118 @@ def force_5g_pci(
         )
 
 
+def _format_cell_table(d: dict) -> Table:
+    """Build a Rich table showing detailed cell connection info."""
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column("key", style="bold")
+    table.add_column("value")
+
+    # Network mode
+    mode_raw = d.get("net_select", "")
+    mode_label = NETWORK_MODES_REVERSE.get(mode_raw, mode_raw)
+    table.add_row("Network mode", f"{mode_label} ({mode_raw})")
+    table.add_row("Connection type", d.get("network_type", ""))
+    table.add_row("Provider", d.get("network_provider", ""))
+    table.add_row("WAN IP", d.get("wan_ipaddr", ""))
+    table.add_row("APN", d.get("wan_apn", ""))
+    table.add_row("", "")
+
+    # 4G main cell
+    lte_pci = d.get("lte_pci", "")
+    pci_dec = str(int(lte_pci, 16)) if lte_pci else ""
+    earfcn = d.get("wan_active_channel", "")
+    lock_pci = d.get("lte_pci_lock", "")
+    lock_earfcn = d.get("lte_earfcn_lock", "")
+    lock_tag = ""
+    if lock_pci and pci_dec == lock_pci:
+        lock_tag = " [red](locked)[/red]"
+    table.add_row("4G PCI", f"{pci_dec}{lock_tag}")
+    table.add_row("4G EARFCN", earfcn)
+    table.add_row("4G band", d.get("wan_active_band", ""))
+    bw = d.get("lte_ca_pcell_bandwidth", "")
+    if bw:
+        table.add_row(
+            "4G PCell",
+            f"B{d.get('lte_ca_pcell_band', '')} ({round(float(bw))} MHz)",
+        )
+    table.add_row("4G RSRP", f"{d.get('lte_rsrp', '')} dBm")
+    table.add_row("4G RSRQ", f"{d.get('lte_rsrq', '')} dB")
+    table.add_row("4G RSSI", f"{d.get('lte_rssi', '')} dBm")
+    table.add_row("4G SNR", f"{d.get('lte_snr', '')} dB")
+
+    # Carrier aggregation
+    ca = d.get("lte_multi_ca_scell_info", "")
+    if ca:
+        table.add_row("", "")
+        for scell in ca.rstrip(";").split(";"):
+            parts = scell.split(",")
+            if len(parts) >= 6:
+                table.add_row(
+                    f"CA SCell B{parts[3]}",
+                    f"PCI {parts[1]}, EARFCN {parts[4]}, {round(float(parts[5]))} MHz",
+                )
+
+    # 5G
+    nr_band = d.get("nr5g_action_band", "")
+    if nr_band:
+        nr_pci = d.get("nr5g_pci", "")
+        nr_pci_dec = str(int(nr_pci, 16)) if nr_pci else ""
+        table.add_row("", "")
+        table.add_row("5G band", nr_band)
+        table.add_row("5G PCI", nr_pci_dec)
+        table.add_row("5G EARFCN", d.get("nr5g_action_channel", ""))
+        table.add_row("5G RSRP", f"{d.get('Z5g_rsrp', '')} dBm")
+        table.add_row("5G SINR", f"{d.get('Z5g_SINR', '')} dB")
+
+    # Band locks
+    table.add_row("", "")
+    lte_mask = d.get("lte_band_ext_1_64", "")
+    if lte_mask and int(lte_mask, 16) != 0:
+        table.add_row("LTE band lock", str(lte_mask_to_bands(lte_mask)))
+    else:
+        table.add_row("LTE band lock", "(all bands)")
+    sa = d.get("nr5g_sa_band_lock", "")
+    nsa = d.get("nr5g_nsa_band_lock", "")
+    if sa:
+        table.add_row("5G SA band lock", sa)
+    if nsa:
+        table.add_row("5G NSA band lock", nsa)
+    if lock_pci:
+        table.add_row("Cell lock", f"PCI {lock_pci}, EARFCN {lock_earfcn}")
+
+    # DNS
+    dns_mode = d.get("dns_mode", "")
+    if dns_mode == "manual":
+        dns = f"{d.get('prefer_dns_manual', '')}, {d.get('standby_dns_manual', '')}"
+        table.add_row("DNS", f"manual ({dns})")
+    elif dns_mode:
+        table.add_row("DNS", dns_mode)
+
+    # Temperature
+    t4g = d.get("pm_sensor_mdm", "")
+    t5g = d.get("pm_modem_5g", "")
+    if t4g or t5g:
+        table.add_row("", "")
+        if t4g:
+            table.add_row("Temp 4G", f"{t4g} C")
+        if t5g:
+            table.add_row("Temp 5G", f"{t5g} C")
+
+    return table
+
+
 @app.command()
 def status(
     router_ip: str = typer.Option(None),
     password: str = typer.Option(None),
 ):
-    """Show current network mode, active bands, and band lock state"""
+    """Show current network mode, active bands, signal, and band lock state"""
     config = check_config(router_ip, password)
     if not config:
         return
     cookies = get_auth_cookies(config["router_ip"], config["password"])
-
-    import requests
-    r = requests.get(
-        f'http://{config["router_ip"]}/goform/goform_get_cmd_process?isTest=false'
-        '&cmd=network_type,net_select,wan_active_band,lte_band,lte_ca_pcell_band,'
-        'lte_ca_pcell_bandwidth,lte_multi_ca_scell_info,'
-        'nr5g_action_band,nr5g_action_channel,'
-        'lte_band_ext_1_64,nr5g_sa_band_lock,nr5g_nsa_band_lock'
-        '&multi_data=1',
-        cookies=cookies, headers={"referer": f'http://{config["router_ip"]}/'}
-    )
-    d = r.json()
-
-    mode_raw = d.get("net_select", "")
-    mode_label = NETWORK_MODES_REVERSE.get(mode_raw, mode_raw)
-    console.print(f"[bold]Network mode[/bold]       : {mode_label} ({mode_raw})")
-    console.print(f"[bold]Connection type[/bold]    : {d.get('network_type', '')}")
-    console.print()
-
-    console.print(f"[bold]Active 4G band[/bold]     : {d.get('wan_active_band', '')} (band {d.get('lte_band', '')})")
-    bw = d.get("lte_ca_pcell_bandwidth", "")
-    if bw:
-        console.print(f"[bold]4G PCell[/bold]           : B{d.get('lte_ca_pcell_band', '')} ({round(float(bw))} MHz)")
-    ca = d.get("lte_multi_ca_scell_info", "")
-    if ca:
-        console.print(f"[bold]4G CA SCells[/bold]       : {ca}")
-    nr_band = d.get("nr5g_action_band", "")
-    if nr_band:
-        console.print(f"[bold]Active 5G band[/bold]     : {nr_band} (ch {d.get('nr5g_action_channel', '')})")
-    console.print()
-
-    lte_mask = d.get("lte_band_ext_1_64", "")
-    if lte_mask and int(lte_mask, 16) != 0:
-        console.print(f"[bold]LTE band lock[/bold]      : {lte_mask_to_bands(lte_mask)}")
-    else:
-        console.print("[bold]LTE band lock[/bold]      : (all bands)")
-    sa = d.get("nr5g_sa_band_lock", "")
-    nsa = d.get("nr5g_nsa_band_lock", "")
-    if sa:
-        console.print(f"[bold]5G SA band lock[/bold]    : {sa}")
-    if nsa:
-        console.print(f"[bold]5G NSA band lock[/bold]   : {nsa}")
+    d = get_network_info(config["router_ip"], cookies)
+    console.print(_format_cell_table(d))
 
 
 @app.command()
@@ -249,6 +306,107 @@ def lock_lte_bands(
         )
         if not success:
             raise typer.Exit(1)
+
+
+@app.command()
+def info(
+    router_ip: str = typer.Option(None),
+    password: str = typer.Option(None),
+):
+    """Show device hardware, web, and firmware version"""
+    config = check_config(router_ip, password)
+    if not config:
+        return
+    cookies = get_auth_cookies(config["router_ip"], config["password"])
+    d = get_device_info(config["router_ip"], cookies)
+    console.print(f"[bold]Hardware version[/bold]  : {d.get('hardware_version', '')}")
+    console.print(f"[bold]Web version[/bold]       : {d.get('web_version', '')}")
+    console.print(f"[bold]Firmware version[/bold]  : {d.get('wa_inner_version', '')}")
+    console.print(f"[bold]CR version[/bold]        : {d.get('cr_version', '')}")
+
+
+@app.command()
+def set_dns_cmd(
+    servers: str = typer.Argument(
+        ...,
+        help="Two DNS servers comma-separated (e.g. '1.1.1.1,1.0.0.1') or 'auto'",
+        metavar="SERVERS",
+    ),
+    router_ip: str = typer.Option(None),
+    password: str = typer.Option(None),
+):
+    """Set DNS servers (e.g. '1.1.1.1,1.0.0.1') or 'auto' for provider defaults"""
+    config = check_config(router_ip, password)
+    if not config:
+        return
+    cookies = get_auth_cookies(config["router_ip"], config["password"])
+    if servers.lower() == "auto":
+        ok = set_dns_auto(config["router_ip"], cookies, verbose=True)
+    else:
+        parts = [s.strip() for s in servers.split(",")]
+        if len(parts) != 2:
+            log.error("Expected two DNS servers separated by comma")
+            raise typer.Exit(1)
+        ok = set_dns(config["router_ip"], cookies, parts[0], parts[1], verbose=True)
+    if not ok:
+        raise typer.Exit(1)
+
+
+@app.command()
+def lock_cell_cmd(
+    pci: int = typer.Argument(..., help="PCI of the cell to lock to"),
+    earfcn: int = typer.Argument(..., help="EARFCN of the cell to lock to"),
+    router_ip: str = typer.Option(None),
+    password: str = typer.Option(None),
+    do_reboot: bool = typer.Option(
+        False, "--reboot", help="Reboot the router after locking"
+    ),
+):
+    """Lock LTE to a specific cell (PCI + EARFCN). Requires reboot to take effect."""
+    config = check_config(router_ip, password)
+    if not config:
+        return
+    cookies = get_auth_cookies(config["router_ip"], config["password"])
+    ok = lock_cell(config["router_ip"], cookies, pci, earfcn, verbose=True)
+    if not ok:
+        raise typer.Exit(1)
+    if do_reboot:
+        reboot_device(config["router_ip"], cookies, verbose=True)
+
+
+@app.command()
+def unlock_cell_cmd(
+    router_ip: str = typer.Option(None),
+    password: str = typer.Option(None),
+    do_reboot: bool = typer.Option(
+        False, "--reboot", help="Reboot the router after unlocking"
+    ),
+):
+    """Remove cell lock. Requires reboot to take effect."""
+    config = check_config(router_ip, password)
+    if not config:
+        return
+    cookies = get_auth_cookies(config["router_ip"], config["password"])
+    ok = unlock_cell(config["router_ip"], cookies, verbose=True)
+    if not ok:
+        raise typer.Exit(1)
+    if do_reboot:
+        reboot_device(config["router_ip"], cookies, verbose=True)
+
+
+@app.command()
+def reboot(
+    router_ip: str = typer.Option(None),
+    password: str = typer.Option(None),
+):
+    """Reboot the router"""
+    config = check_config(router_ip, password)
+    if not config:
+        return
+    cookies = get_auth_cookies(config["router_ip"], config["password"])
+    ok = reboot_device(config["router_ip"], cookies, verbose=True)
+    if not ok:
+        raise typer.Exit(1)
 
 
 @app.command()
