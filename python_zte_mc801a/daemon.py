@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 
+from python_zte_mc801a.lib.active_state import get_active_lte_bands, get_active_5g_bands
 from python_zte_mc801a.lib.constants import lte_mask_to_bands
 from python_zte_mc801a.lib.router_requests import (
     NETWORK_MODES,
@@ -34,6 +35,18 @@ def load_watchdog_config(path: str) -> dict:
         cfg = yaml.safe_load(f)
     if not cfg or "router_ip" not in cfg or "password" not in cfg:
         raise ValueError("Config must contain at least 'router_ip' and 'password'")
+    lte_bands = cfg.get("lte_bands")
+    if lte_bands and "min_active_lte_bands" in cfg and cfg["min_active_lte_bands"] > len(lte_bands):
+        log.warning(
+            f"min_active_lte_bands {cfg['min_active_lte_bands']} exceeds locked-band count {len(lte_bands)}; clamping"
+        )
+        cfg["min_active_lte_bands"] = len(lte_bands)
+    nr5g_bands = cfg.get("nr5g_bands")
+    if nr5g_bands and "min_active_nr5g_bands" in cfg and cfg["min_active_nr5g_bands"] > len(nr5g_bands):
+        log.warning(
+            f"min_active_nr5g_bands {cfg['min_active_nr5g_bands']} exceeds locked-band count {len(nr5g_bands)}; clamping"
+        )
+        cfg["min_active_nr5g_bands"] = len(nr5g_bands)
     return cfg
 
 
@@ -121,10 +134,37 @@ def _check_dns(cfg: dict, info: dict, ip: str, cookies: dict) -> bool:
     return set_dns(ip, cookies, desired_primary, desired_secondary, verbose=True)
 
 
+def _check_active_bands(cfg: dict, info: dict, ip: str, cookies: dict) -> bool:
+    """Check active (radio-level) bands against minimums; re-apply lock if below threshold."""
+    ok = True
+
+    desired_lte = cfg.get("lte_bands")
+    min_lte = cfg.get("min_active_lte_bands", len(desired_lte) if desired_lte else None)
+    if min_lte is not None and desired_lte:
+        active_lte = get_active_lte_bands(info)
+        if len(active_lte) < min_lte:
+            log.warning(f"LTE active bands {active_lte} < min {min_lte}; re-applying lock {sorted(desired_lte)}")
+            if not set_lte_band(ip, cookies, desired_lte, verbose=True):
+                ok = False
+
+    desired_nr = cfg.get("nr5g_bands")
+    min_nr = cfg.get("min_active_nr5g_bands", len(desired_nr) if desired_nr else None)
+    if min_nr is not None and desired_nr:
+        active_nr = get_active_5g_bands(info)
+        if len(active_nr) < min_nr:
+            log.warning(f"5G active bands {active_nr} < min {min_nr}; re-applying lock {sorted(desired_nr)}")
+            desired_str = ",".join(str(b) for b in sorted(desired_nr))
+            if not set_5g_band(ip, cookies, desired_str, verbose=True):
+                ok = False
+
+    return ok
+
+
 CHECKS = [
     _check_network_mode,
     _check_lte_bands,
     _check_5g_bands,
+    _check_active_bands,
     _check_cell_lock,
     _check_dns,
 ]

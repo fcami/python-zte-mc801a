@@ -22,3 +22,8 @@ password: "YOUR_PASSWORD"
 # dns:
 #   primary: "1.1.1.1"
 #   secondary: "1.0.0.1"
+
+# Active-band minimums (optional): detect carrier-aggregation drop independently of the lock setting.
+# The lock can read correct while the radio is stuck on a single band; these thresholds catch that.
+# min_active_lte_bands: 2   # trigger if fewer than this many LTE bands are actually aggregated
+# min_active_nr5g_bands: 1  # trigger if fewer than this many NR bands are actually active

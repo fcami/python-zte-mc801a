@@ -172,8 +172,7 @@ python-zte-mc801a live --viz power-5g     # 5G signal power graph
 
 ## Watchdog daemon
 
-The watchdog monitors router state at a regular interval and re-applies
-desired settings if the router drifts (e.g. after a reconnection).
+The watchdog monitors router state at a regular interval and re-applies desired settings if the router drifts — including lock-setting drift and active-band drop where the lock reads correct but the radio is stuck on fewer bands.
 
 ```bash
 python-zte-mc801a watchdog                        # default: watchdog.yml, 30s
@@ -191,6 +190,8 @@ password: "YOUR_PASSWORD"
 network_mode: "4G"        # 5G+4G+3G, 5G_NSA, 5G_SA, 4G+5G, 4G+3G, 4G, 3G
 lte_bands: [3, 7, 28]     # LTE band numbers to lock to
 nr5g_bands: [28, 78]      # NR band numbers to lock to
+min_active_lte_bands: 2   # re-apply lock if fewer CA bands active (detects lock-correct-but-stuck)
+min_active_nr5g_bands: 1  # re-apply 5G lock if fewer NR bands active
 
 cell_lock:
   pci: 123

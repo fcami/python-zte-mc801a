@@ -24,6 +24,7 @@ termplotlib = "^0.3.9"
 black = {version = "^23.1a1", allow-prereleases = true}
 flake8 = "^7.0"
 pylint = "^3.0"
+pytest = "^8.0"
 
 [tool.pylint.main]
 load-plugins = []
