@@ -18,6 +18,31 @@ conditions on ending a turn or making a commit.
   plaintext credentials or runtime state. If you add a new config file with
   secrets, gitignore it in the same turn.
 
+## Protected artefacts
+
+`USER_STORIES.md` is a contract with the user, not a freely-editable
+artefact. User stories may only be deleted, renumbered, reworded in a way
+that changes their meaning, or have their state tag (`DONE` / `PARTIAL`
+/ `GAP`) modified when **both** of these conditions are met:
+
+1. The user has explicitly prompted you to change them in the current
+   turn.
+2. The user has explicitly approved the specific proposed change.
+
+A general instruction such as "clean up the repo", "make these
+consistent", or "update the docs" is **not** sufficient authorisation.
+Story IDs (`A1`, `A2`, … through the current highest ID and any future
+epic) are stable identifiers referenced from `TODO.md`, commit messages,
+and pull requests — never reassign them.
+
+Light typo or grammar fixes that preserve meaning are permitted. Adding a
+new epic or new stories at the user's explicit request is permitted.
+Everything else — deletion, reordering, retagging, semantic rewording —
+requires the two-step authorisation above.
+
+If you discover a story has become obsolete or misleading, surface it to
+the user and ask. Do not silently edit or delete it.
+
 ## Commit discipline (Beck / Fowler)
 
 - **Smallest meaningful change.** Each commit represents one logical
