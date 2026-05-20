@@ -5,3 +5,22 @@ settings.yml
 watchdog.yml
 __pycache__
 __pycache__/*
+
+# Secrets / runtime state
+watchdog.yml
+
+# Python build / install artefacts
+*.egg-info/
+build/
+dist/
+
+# Test and coverage caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Stray bytecode outside __pycache__
+*.pyc
+
+# JetBrains IDE state
+.idea/
