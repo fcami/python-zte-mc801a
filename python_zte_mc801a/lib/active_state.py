@@ -7,21 +7,17 @@ def get_active_lte_bands(info: dict) -> list:
     """Return sorted deduplicated LTE bands in use (PCell + SCells). Empty list if none."""
     bands = set()
 
-    pcell = str(info.get("lte_ca_pcell_band", "") or "").strip()
-    if pcell:
-        digits = re.sub(r"[^0-9]", "", pcell)
-        if digits:
-            n = int(digits)
-            if n > 0:
-                bands.add(n)
+    # PCell band. The router reports "0" (a literal zero string, not "") when
+    # carrier aggregation is inactive, so treat a non-positive PCell as "no
+    # reading" and fall back to the plain active band rather than reporting
+    # no bands at all while the modem is in fact connected on the primary.
+    pcell_digits = re.sub(r"[^0-9]", "", str(info.get("lte_ca_pcell_band", "") or "").strip())
+    if pcell_digits and int(pcell_digits) > 0:
+        bands.add(int(pcell_digits))
     else:
-        wan = str(info.get("wan_active_band", "") or "").strip()
-        if wan:
-            digits = re.sub(r"[^0-9]", "", wan)
-            if digits:
-                n = int(digits)
-                if n > 0:
-                    bands.add(n)
+        wan_digits = re.sub(r"[^0-9]", "", str(info.get("wan_active_band", "") or "").strip())
+        if wan_digits and int(wan_digits) > 0:
+            bands.add(int(wan_digits))
 
     ca = str(info.get("lte_multi_ca_scell_info", "") or "").strip()
     if ca:

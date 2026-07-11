@@ -68,6 +68,28 @@ def test_deduplication():
     assert get_active_lte_bands(info) == [3]
 
 
+def test_pcell_zero_falls_back_to_wan_active_band():
+    # CA inactive: router reports pcell "0" (not ""); must fall back to wan_active_band
+    info = {"lte_ca_pcell_band": "0", "wan_active_band": "LTE BAND 28"}
+    assert get_active_lte_bands(info) == [28]
+
+
+def test_pcell_zero_with_scells_reports_scells():
+    # pcell "0" but SCells present: base band from wan fallback plus the SCell bands
+    info = {
+        "lte_ca_pcell_band": "0",
+        "wan_active_band": "LTE BAND 28",
+        "lte_multi_ca_scell_info": "1,85,1,7,3350,20;",
+    }
+    assert get_active_lte_bands(info) == [7, 28]
+
+
+def test_pcell_zero_without_wan_returns_empty():
+    # pcell "0" and no usable wan_active_band: genuinely nothing active
+    info = {"lte_ca_pcell_band": "0", "wan_active_band": ""}
+    assert get_active_lte_bands(info) == []
+
+
 # --- 5G ---
 
 def test_5g_n_prefix():
