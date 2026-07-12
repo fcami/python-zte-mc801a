@@ -1,10 +1,12 @@
 """Interactive band monitor (C5): live status + on-demand band reset.
 
-Redraws once per second and handles single-key input: r = reset now (collapse
-to the base band, then restore the current reset target), b = cycle the reset
-target for the next r, p = pause, q = quit. The reset runs on a worker thread
-so the display keeps updating while the bands drop and recover. Only terminal
-I/O lives here; frame rendering is in lib/monitor_view.
+Redraws about 4x/second (RENDER_TICK) while polling the router about once per
+second (interval), so the on-screen clock stays live between fetches. Handles
+single-key input: r = reset now (collapse to the base band, then restore the
+current reset target), b = cycle the reset target for the next r, p = pause,
+q = quit. The reset runs on a worker thread so the display keeps updating
+while the bands drop and recover. Only terminal I/O lives here; frame
+rendering is in lib/monitor_view.
 
 The download/bandwidth probe is intentionally NOT implemented in Python (it
 targets the Rust port, per Epic J), so 'p' currently only toggles the paused
@@ -34,6 +36,7 @@ from python_zte_mc801a.lib.router_requests import (
 )
 
 AUTH_REFRESH_S = 20  # router session cookie expires ~30s after login
+RENDER_TICK = 0.25  # display/clock refresh cadence, independent of router fetch
 DEFAULT_KEYS = {"reset": "r", "pause": "p", "bands": "b", "quit": "q"}
 
 
@@ -150,6 +153,8 @@ def run_monitor(config, base_band, full_bands, settle_s: float = 15.0, keys=None
 
     cookies = get_auth_cookies(ip, pw)
     last_auth = time.time()
+    info = {}
+    last_fetch = 0.0  # far enough in the past to force a fetch on the first tick
 
     fd = sys.stdin.fileno()
     old_term = termios.tcgetattr(fd)
@@ -158,22 +163,24 @@ def run_monitor(config, base_band, full_bands, settle_s: float = 15.0, keys=None
         tty.setcbreak(fd)
         with Live(auto_refresh=False, screen=False) as live:
             while True:
-                if time.time() - last_auth > AUTH_REFRESH_S:
+                if time.monotonic() - last_fetch >= interval:
+                    if time.time() - last_auth > AUTH_REFRESH_S:
+                        try:
+                            cookies = get_auth_cookies(ip, pw)
+                            last_auth = time.time()
+                        except Exception as exc:  # noqa: BLE001
+                            error = f"auth: {exc}"
                     try:
-                        cookies = get_auth_cookies(ip, pw)
-                        last_auth = time.time()
-                    except Exception as exc:  # noqa: BLE001
-                        error = f"auth: {exc}"
-                try:
-                    info = get_network_info(ip, cookies)
-                    if not info.get("wan_active_band"):  # stale session -> re-auth once
-                        cookies = get_auth_cookies(ip, pw)
-                        last_auth = time.time()
                         info = get_network_info(ip, cookies)
-                    error = None
-                except Exception as exc:  # noqa: BLE001
-                    info = {}
-                    error = f"fetch: {exc}"
+                        if not info.get("wan_active_band"):  # stale session -> re-auth once
+                            cookies = get_auth_cookies(ip, pw)
+                            last_auth = time.time()
+                            info = get_network_info(ip, cookies)
+                        error = None
+                    except Exception as exc:  # noqa: BLE001
+                        info = {}
+                        error = f"fetch: {exc}"
+                    last_fetch = time.monotonic()
 
                 if worker is not None and not worker.is_alive():
                     worker = None
@@ -186,7 +193,7 @@ def run_monitor(config, base_band, full_bands, settle_s: float = 15.0, keys=None
                 live.update(render(state, keys))
                 live.refresh()
 
-                ready, _, _ = select.select([sys.stdin], [], [], interval)
+                ready, _, _ = select.select([sys.stdin], [], [], RENDER_TICK)
                 if not ready:
                     continue
                 ch = sys.stdin.read(1)
