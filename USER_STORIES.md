@@ -26,6 +26,7 @@ This project is a Python library, CLI, and watchdog daemon for the ZTE MC801a 5G
 - **C2.** As an operator, the live panel highlights when active bands drop below the desired set or DL throughput falls below a threshold, so drift is visible at a glance. *(GAP)*
 - **C3.** As an operator, each remediation prints a timestamped before/after line (e.g. "LTE active bands [3] → re-applied lock [3,7,28] → after 5s active bands [3,7]"), so I can confirm the action had an effect. *(GAP)*
 - **C4.** As an operator, I can pass --once to run a single check-remediate cycle and exit, for ad-hoc verification or cron use. *(GAP)*
+- **C5.** As an operator, I run an interactive monitor that redraws the modem's active bands and signal once per second and lets me press a key (default `r`) to force an immediate band reset (collapse to the base band, then restore the full lock), plus `p` to pause automated probing and `q` to quit, with the available keys always shown on screen, so that I can watch carrier-aggregation drops and fix them on the spot without waiting for any automated test. *(GAP)*
 
 ## Epic D — Daemon (background service)
 
@@ -85,6 +86,8 @@ This project is a Python library, CLI, and watchdog daemon for the ZTE MC801a 5G
 ## Epic J — Active bandwidth measurement and off-hours self-healing
 
 This firmware does not expose realtime throughput via goform (the traffic-stats fields read empty), so throughput-based drift signals referenced in Epics A/B/C/D are sourced here by *active* measurement instead of a passive router field.
+
+Priority note: the operator-facing centerpiece is the live band monitor with on-demand reset (C5); the active download test and its scheduler are the *background* complement and are deferred. The J2 scheduler logic is implemented and unit-tested but not yet wired into any command, and the project will likely move to the Rust port before the download test lands.
 
 - **J1.** As an operator, I configure one or more test-file URLs (fast mirrors) and the tool measures achievable download bandwidth by fetching one, capped by a maximum byte count and a maximum duration, so that I get a real capacity number despite the firmware exposing no throughput field. *(GAP)*
 - **J2.** As an operator, active bandwidth probes run only during configured off-hours windows (multiple local-time ranges, e.g. 02:00–05:00), so that self-healing never competes with daytime usage and its brief single-band dip is harmless. *(GAP)*
