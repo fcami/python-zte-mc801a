@@ -1,5 +1,14 @@
 """Tests for the band-monitor pure helpers (no TTY required)."""
-from python_zte_mc801a.monitor import _build_state, _fmt_pcell, _fmt_scells, anchor_band, band_reset_presets
+import pytest
+
+from python_zte_mc801a.monitor import (
+    _build_state,
+    _fmt_pcell,
+    _fmt_scells,
+    anchor_band,
+    band_reset_presets,
+    resolve_monitor_bands,
+)
 
 
 def test_fmt_pcell_normal():
@@ -58,3 +67,20 @@ def test_band_reset_presets_two_bands_dedupes():
 
 def test_band_reset_presets_single_band():
     assert band_reset_presets([28]) == [[28]]
+
+
+def test_resolve_monitor_bands_prefers_bands_opt():
+    assert resolve_monitor_bands("3, 7,28", [1], [1, 2]) == [3, 7, 28]
+
+
+def test_resolve_monitor_bands_falls_back_to_persisted():
+    assert resolve_monitor_bands(None, [3, 7, 28], [1, 2]) == [3, 7, 28]
+
+
+def test_resolve_monitor_bands_bootstraps_from_current_lock():
+    assert resolve_monitor_bands(None, None, [28, 3]) == [3, 28]
+
+
+def test_resolve_monitor_bands_raises_when_nothing_available():
+    with pytest.raises(ValueError, match="Pass --bands"):
+        resolve_monitor_bands(None, None, [28])

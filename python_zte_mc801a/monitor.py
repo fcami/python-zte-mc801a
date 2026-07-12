@@ -59,6 +59,26 @@ def band_reset_presets(locked_bands: list) -> list:
     return presets
 
 
+def resolve_monitor_bands(bands_opt, persisted, current_lock) -> list:
+    """Resolve the monitor's full reference band set (C6).
+
+    Priority: --bands (``bands_opt``, a "3,7,28" string) > the saved
+    ``monitor_bands`` (``persisted``) > the current lock, as a first-run
+    bootstrap, if it already has at least 2 bands. Otherwise there is
+    nothing safe to widen back to, so this raises.
+    """
+    if bands_opt:
+        return [int(b.strip()) for b in bands_opt.split(",")]
+    if persisted:
+        return list(persisted)
+    if len(current_lock) >= 2:
+        return sorted(current_lock)
+    raise ValueError(
+        "No saved band set and the current lock has fewer than 2 bands. Pass"
+        " --bands (e.g. --bands 3,7,28) to set your full reference set."
+    )
+
+
 def _digits_to_band(value):
     digits = "".join(c for c in str(value or "") if c.isdigit())
     n = int(digits) if digits else 0

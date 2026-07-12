@@ -185,6 +185,8 @@ Gives a once-per-second view of active bands and signal. Keys:
 
 `--base-band`, `--bands`, and `--settle` override the anchor band, the full band set to restore, and the collapse/restore settle time.
 
+The monitor saves your full reference band set to `settings.yml` (`monitor_bands`) and always offers the full presets built from it, so narrowing the live lock to one band (e.g. for rain fade or to cut packet loss) never strands you there — `b`/`r` can always widen back. `--bands` updates the saved set; it refuses to start on a single-band lock when nothing is saved yet.
+
 ## Watchdog daemon
 
 The watchdog monitors router state at a regular interval and re-applies desired settings if the router drifts — including lock-setting drift and active-band drop where the lock reads correct but the radio is stuck on fewer bands.

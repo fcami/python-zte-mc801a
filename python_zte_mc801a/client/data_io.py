@@ -30,6 +30,22 @@ def check_config(router_ip: str, password: str) -> dict:
     return None
 
 
+def save_monitor_bands(bands, path="settings.yml"):
+    """Persist the monitor's full reference band set to settings.yml.
+
+    No-op if the settings file doesn't exist yet -- there is nothing to
+    preserve router_ip/password into.
+    """
+    p = Path(path)
+    if not p.exists():
+        return
+    with open(p, "r") as f:
+        config = yaml.safe_load(f) or {}
+    config["monitor_bands"] = [int(b) for b in bands]
+    with open(p, "w") as f:
+        yaml.safe_dump(config, f)
+
+
 def check_create_data_file():
     if not Path("data.json").exists():
         Path("data.json").touch()

@@ -546,7 +546,7 @@ def watchdog(
 @app.command()
 def monitor(
     base_band: int = typer.Option(None, help="Band to collapse to on reset (default: current PCell anchor)"),
-    bands: str = typer.Option(None, help="Full band set to restore, e.g. '3,7,28' (default: current lock)"),
+    bands: str = typer.Option(None, help="Full reference band set, e.g. '3,7,28'; saved to settings.yml."),
     settle: float = typer.Option(15.0, help="Seconds between collapse and restore on reset"),
     router_ip: str = typer.Option(None, help=_IP_HELP),
     password: str = typer.Option(None, help=_PW_HELP),
@@ -555,25 +555,21 @@ def monitor(
     config = check_config(router_ip, password)
     if not config:
         return
-    from python_zte_mc801a.monitor import anchor_band, run_monitor
+    from python_zte_mc801a.client.data_io import save_monitor_bands
+    from python_zte_mc801a.monitor import anchor_band, resolve_monitor_bands, run_monitor
 
     cookies = get_auth_cookies(config["router_ip"], config["password"])
     info = get_network_info(config["router_ip"], cookies)
-    if bands:
-        try:
-            full = [int(b.strip()) for b in bands.split(",")]
-        except ValueError:
-            log.error("Invalid --bands; expected e.g. '3,7,28'")
-            raise typer.Exit(1)
-    else:
-        mask = info.get("lte_band_ext_1_64", "")
-        full = lte_mask_to_bands(mask) if mask and int(mask, 16) != 0 else []
-    if not full:
-        log.error(
-            "No LTE band lock is set and --bands not given; a reset would have nothing"
-            " to restore. Set a lock (lock-lte-bands) or pass --bands."
-        )
+    mask = info.get("lte_band_ext_1_64", "")
+    current_lock = lte_mask_to_bands(mask) if mask and int(mask, 16) != 0 else []
+    persisted = config.get("monitor_bands")
+    try:
+        full = resolve_monitor_bands(bands, persisted, current_lock)
+    except ValueError as exc:
+        log.error(str(exc))
         raise typer.Exit(1)
+    if full != persisted:
+        save_monitor_bands(full)
     base = base_band if base_band is not None else (anchor_band(info) or min(full))
     run_monitor(config, base, full, settle_s=settle)
 
