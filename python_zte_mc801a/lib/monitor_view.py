@@ -9,7 +9,7 @@ Expected ``state`` keys (all optional): now, active_bands (list[int]),
 pcell (str), scells (list[str]), rsrp, rsrq, snr, temp, mode,
 band_lock (list[int]), cell_lock (str), paused (bool),
 reset_status ("idle"|"running"|"ok"|"failed"|"error: ..."), last_reset (str),
-error (str).
+error (str), reset_bands (list[int]), reset_choice (str, e.g. "2/4").
 """
 from rich.panel import Panel
 from rich.table import Table
@@ -61,11 +61,16 @@ def render(state: dict, keys: dict) -> Panel:
     reset_style = {"running": "bold yellow", "ok": "green", "idle": "dim"}.get(reset_status, "red")
     reset_line = f"ok ({state.get('last_reset', '')})" if reset_status == "ok" else reset_status
     body.add_row("Reset", Text(reset_line, style=reset_style))
+    reset_bands = state.get("reset_bands") or []
+    reset_choice = state.get("reset_choice", "")
+    target_line = _fmt_bands(reset_bands) + (f"   ({reset_choice})" if reset_choice else "")
+    body.add_row("Reset target", target_line)
     if state.get("error"):
         body.add_row("Error", Text(state["error"], style="red"))
 
     legend = Text.assemble(
         ("[", "dim"), (keys.get("reset", "r"), "bold cyan"), ("] reset    ", "dim"),
+        ("[", "dim"), (keys.get("bands", "b"), "bold cyan"), ("] bands    ", "dim"),
         ("[", "dim"), (keys.get("pause", "p"), "bold cyan"), ("] pause    ", "dim"),
         ("[", "dim"), (keys.get("quit", "q"), "bold cyan"), ("] quit", "dim"),
     )

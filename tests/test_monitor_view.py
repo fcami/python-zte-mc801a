@@ -38,3 +38,13 @@ def test_render_handles_empty_state():
     out = _text({})
     assert "quit" in out          # legend still rendered
     assert "(none)" in out        # no active bands / no lock
+
+
+def test_render_shows_reset_target_and_legend_key():
+    out = _text({
+        "active_bands": [3, 7, 28], "reset_bands": [3, 28], "reset_choice": "2/4",
+    })
+    assert "Reset target" in out
+    assert "B3" in out and "B28" in out
+    assert "2/4" in out
+    assert "bands" in out  # [b] legend entry

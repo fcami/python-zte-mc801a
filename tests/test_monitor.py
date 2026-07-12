@@ -1,5 +1,5 @@
 """Tests for the band-monitor pure helpers (no TTY required)."""
-from python_zte_mc801a.monitor import _build_state, _fmt_pcell, _fmt_scells, anchor_band
+from python_zte_mc801a.monitor import _build_state, _fmt_pcell, _fmt_scells, anchor_band, band_reset_presets
 
 
 def test_fmt_pcell_normal():
@@ -46,3 +46,15 @@ def test_build_state_maps_fields_and_lock():
     assert state["cell_lock"].startswith("PCI 455")
     assert state["paused"] is True
     assert state["rsrp"] == "-97"
+
+
+def test_band_reset_presets_three_bands():
+    assert band_reset_presets([3, 7, 28]) == [[3, 7, 28], [3, 28], [7, 28], [28]]
+
+
+def test_band_reset_presets_two_bands_dedupes():
+    assert band_reset_presets([3, 28]) == [[3, 28], [28]]
+
+
+def test_band_reset_presets_single_band():
+    assert band_reset_presets([28]) == [[28]]

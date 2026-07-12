@@ -551,7 +551,7 @@ def monitor(
     router_ip: str = typer.Option(None, help=_IP_HELP),
     password: str = typer.Option(None, help=_PW_HELP),
 ):
-    """Live band monitor: redraws every second; press r to reset, p to pause, q to quit."""
+    """Live band monitor: redraws every second; press r to reset, b to change which bands r restores, p to pause, q to quit."""
     config = check_config(router_ip, password)
     if not config:
         return

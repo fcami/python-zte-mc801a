@@ -3,6 +3,22 @@ ALL_5G_BANDS = (
     "66,70,71,74,75,76,77,78,79,80,81,82,83,84"
 )
 
+# LTE band -> downlink centre frequency (MHz), for sorting bands by spectrum
+# position rather than band number.
+LTE_BAND_DL_MHZ = {
+    1: 2140, 3: 1842, 5: 881, 7: 2655, 8: 942, 20: 806, 28: 780, 32: 1474,
+    38: 2593, 40: 2350, 41: 2593, 42: 3500, 43: 3700,
+}
+
+
+def sort_bands_by_freq(bands: list) -> list:
+    """Sort LTE band numbers ascending by downlink frequency.
+
+    Bands not present in ``LTE_BAND_DL_MHZ`` sort after all known bands,
+    ordered by band number.
+    """
+    return sorted(bands, key=lambda b: (b not in LTE_BAND_DL_MHZ, LTE_BAND_DL_MHZ.get(b, b)))
+
 
 # LTE band bitmask: bit (N-1) represents band N.
 # Verified from router JS (goformId=SET_NETWORK_BAND_LOCK).

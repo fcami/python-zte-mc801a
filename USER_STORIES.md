@@ -26,7 +26,7 @@ This project is a Python library, CLI, and watchdog daemon for the ZTE MC801a 5G
 - **C2.** As an operator, the live panel highlights when active bands drop below the desired set or DL throughput falls below a threshold, so drift is visible at a glance. *(GAP)*
 - **C3.** As an operator, each remediation prints a timestamped before/after line (e.g. "LTE active bands [3] → re-applied lock [3,7,28] → after 5s active bands [3,7]"), so I can confirm the action had an effect. *(GAP)*
 - **C4.** As an operator, I can pass --once to run a single check-remediate cycle and exit, for ad-hoc verification or cron use. *(GAP)*
-- **C5.** As an operator, I run an interactive monitor that redraws the modem's active bands and signal once per second and lets me press a key (default `r`) to force an immediate band reset (collapse to the base band, then restore the full lock), plus `p` to pause automated probing and `q` to quit, with the available keys always shown on screen, so that I can watch carrier-aggregation drops and fix them on the spot without waiting for any automated test. *(GAP)*
+- **C5.** As an operator, I run an interactive monitor that redraws the modem's active bands and signal once per second and lets me press a key (default `r`) to force an immediate band reset (collapse to the base band, then restore the selected target set), `b` to cycle which bands `r` will restore (full lock → drop the highest-frequency band → anchor + highest → anchor only), plus `p` to pause and `q` to quit, with the available keys always shown on screen, so that I can watch carrier-aggregation drops and fix them on the spot without waiting for any automated test. *(DONE)*
 
 ## Epic D — Daemon (background service)
 

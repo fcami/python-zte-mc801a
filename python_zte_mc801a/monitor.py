@@ -1,9 +1,10 @@
 """Interactive band monitor (C5): live status + on-demand band reset.
 
 Redraws once per second and handles single-key input: r = reset now (collapse
-to the base band, then restore the full lock), p = pause, q = quit. The reset
-runs on a worker thread so the display keeps updating while the bands drop and
-recover. Only terminal I/O lives here; frame rendering is in lib/monitor_view.
+to the base band, then restore the current reset target), b = cycle the reset
+target for the next r, p = pause, q = quit. The reset runs on a worker thread
+so the display keeps updating while the bands drop and recover. Only terminal
+I/O lives here; frame rendering is in lib/monitor_view.
 
 The download/bandwidth probe is intentionally NOT implemented in Python (it
 targets the Rust port, per Epic J), so 'p' currently only toggles the paused
@@ -23,7 +24,7 @@ from datetime import datetime
 from rich.live import Live
 
 from python_zte_mc801a.lib.active_state import get_active_lte_bands
-from python_zte_mc801a.lib.constants import lte_mask_to_bands
+from python_zte_mc801a.lib.constants import lte_mask_to_bands, sort_bands_by_freq
 from python_zte_mc801a.lib.monitor_view import render
 from python_zte_mc801a.lib.reset import reset_lte_bands
 from python_zte_mc801a.lib.router_requests import (
@@ -33,7 +34,26 @@ from python_zte_mc801a.lib.router_requests import (
 )
 
 AUTH_REFRESH_S = 20  # router session cookie expires ~30s after login
-DEFAULT_KEYS = {"reset": "r", "pause": "p", "quit": "q"}
+DEFAULT_KEYS = {"reset": "r", "pause": "p", "bands": "b", "quit": "q"}
+
+
+def band_reset_presets(locked_bands: list) -> list:
+    """Candidate band sets the 'b' key cycles through for the next reset.
+
+    Ordered from the full lock down to the single lowest-frequency band,
+    dropping the highest-frequency band one at a time. Duplicates (which
+    occur once only two bands remain) are removed, keeping the first
+    occurrence.
+    """
+    f = sort_bands_by_freq(locked_bands)
+    if len(f) < 2:
+        return [sorted(locked_bands)]
+    candidates = [sorted(f), sorted(f[:-1]), sorted([f[0], f[-1]]), [f[0]]]
+    presets = []
+    for candidate in candidates:
+        if candidate not in presets:
+            presets.append(candidate)
+    return presets
 
 
 def _digits_to_band(value):
@@ -64,7 +84,15 @@ def _fmt_scells(info: dict) -> list:
     return out
 
 
-def _build_state(info: dict, paused: bool, reset_status: str, last_reset: str, error) -> dict:
+def _build_state(
+    info: dict,
+    paused: bool,
+    reset_status: str,
+    last_reset: str,
+    error,
+    reset_bands: list = None,
+    reset_choice: str = "",
+) -> dict:
     mask = info.get("lte_band_ext_1_64", "")
     band_lock = lte_mask_to_bands(mask) if mask and int(mask, 16) != 0 else []
     cell_lock = ""
@@ -86,6 +114,8 @@ def _build_state(info: dict, paused: bool, reset_status: str, last_reset: str, e
         "reset_status": reset_status,
         "last_reset": last_reset,
         "error": error,
+        "reset_bands": reset_bands or [],
+        "reset_choice": reset_choice,
     }
 
 
@@ -115,6 +145,8 @@ def run_monitor(config, base_band, full_bands, settle_s: float = 15.0, keys=None
     shared = _ResetState()
     paused = False
     error = None
+    presets = band_reset_presets(full_bands)
+    preset_idx = 0
 
     cookies = get_auth_cookies(ip, pw)
     last_auth = time.time()
@@ -146,7 +178,12 @@ def run_monitor(config, base_band, full_bands, settle_s: float = 15.0, keys=None
                 if worker is not None and not worker.is_alive():
                     worker = None
 
-                live.update(render(_build_state(info, paused, shared.status, shared.last, error), keys))
+                state = _build_state(
+                    info, paused, shared.status, shared.last, error,
+                    reset_bands=presets[preset_idx],
+                    reset_choice=f"{preset_idx + 1}/{len(presets)}",
+                )
+                live.update(render(state, keys))
                 live.refresh()
 
                 ready, _, _ = select.select([sys.stdin], [], [], interval)
@@ -157,11 +194,13 @@ def run_monitor(config, base_band, full_bands, settle_s: float = 15.0, keys=None
                     break
                 if ch == keys["pause"]:
                     paused = not paused
+                elif ch == keys["bands"]:
+                    preset_idx = (preset_idx + 1) % len(presets)
                 elif ch == keys["reset"] and worker is None:
                     shared.status = "running"
                     worker = threading.Thread(
                         target=_reset_worker,
-                        args=(shared, ip, pw, base_band, full_bands, settle_s),
+                        args=(shared, ip, pw, base_band, presets[preset_idx], settle_s),
                         daemon=True,
                     )
                     worker.start()

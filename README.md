@@ -170,6 +170,21 @@ python-zte-mc801a live --viz power-4g     # 4G signal power graph
 python-zte-mc801a live --viz power-5g     # 5G signal power graph
 ```
 
+## Live monitor
+
+```bash
+python-zte-mc801a monitor
+```
+
+Gives a once-per-second view of active bands and signal. Keys:
+
+- `r` — reset now: collapse to the anchor band, then restore the selected target
+- `b` — cycle the reset target: full lock → drop highest-freq band → anchor + highest → anchor only
+- `p` — pause
+- `q` — quit
+
+`--base-band`, `--bands`, and `--settle` override the anchor band, the full band set to restore, and the collapse/restore settle time.
+
 ## Watchdog daemon
 
 The watchdog monitors router state at a regular interval and re-applies desired settings if the router drifts — including lock-setting drift and active-band drop where the lock reads correct but the radio is stuck on fewer bands.
