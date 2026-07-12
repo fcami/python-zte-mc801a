@@ -20,6 +20,7 @@ def test_render_shows_active_bands_signal_and_legend():
     assert "B3" in out and "B7" in out and "B28" in out
     assert "700" in out and "780" in out  # nominal[DL centre] for B28
     assert "-97" in out and "4.0" in out
+    assert "18:42:03" in out  # clock lives in the body, not the title
     # hotkey legend is always present
     assert "reset" in out and "pause" in out and "quit" in out
 

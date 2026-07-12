@@ -161,7 +161,7 @@ def run_monitor(config, base_band, full_bands, settle_s: float = 15.0, keys=None
     worker = None
     try:
         tty.setcbreak(fd)
-        with Live(auto_refresh=False, screen=False) as live:
+        with Live(auto_refresh=False, screen=True) as live:
             while True:
                 if time.monotonic() - last_fetch >= interval:
                     if time.time() - last_auth > AUTH_REFRESH_S:

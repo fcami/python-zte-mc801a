@@ -40,6 +40,8 @@ def render(state: dict, keys: dict) -> Panel:
     body.add_column(justify="right", style="bold")
     body.add_column()
 
+    body.add_row("Time", state.get("now", ""))
+    body.add_row("", "")
     body.add_row("Active LTE", Text(_fmt_bands(active), style=_band_style(active, band_lock)))
     if state.get("pcell"):
         body.add_row("PCell", state["pcell"])
@@ -84,4 +86,4 @@ def render(state: dict, keys: dict) -> Panel:
     grid.add_row(Text(""))
     grid.add_row(legend)
 
-    return Panel(grid, title=f"ZTE MC801a monitor  {state.get('now', '')}", border_style="cyan")
+    return Panel(grid, title="ZTE MC801a monitor", border_style="cyan")
