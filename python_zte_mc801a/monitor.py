@@ -163,7 +163,10 @@ def run_monitor(config, base_band, full_bands, settle_s: float = 15.0, keys=None
         tty.setcbreak(fd)
         with Live(auto_refresh=False, screen=True) as live:
             while True:
-                if time.monotonic() - last_fetch >= interval:
+                if worker is not None and not worker.is_alive():
+                    worker = None
+
+                if worker is None and time.monotonic() - last_fetch >= interval:
                     if time.time() - last_auth > AUTH_REFRESH_S:
                         try:
                             cookies = get_auth_cookies(ip, pw)
@@ -181,9 +184,6 @@ def run_monitor(config, base_band, full_bands, settle_s: float = 15.0, keys=None
                         info = {}
                         error = f"fetch: {exc}"
                     last_fetch = time.monotonic()
-
-                if worker is not None and not worker.is_alive():
-                    worker = None
 
                 state = _build_state(
                     info, paused, shared.status, shared.last, error,
