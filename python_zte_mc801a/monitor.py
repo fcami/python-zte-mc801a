@@ -24,7 +24,7 @@ from datetime import datetime
 from rich.live import Live
 
 from python_zte_mc801a.lib.active_state import get_active_lte_bands
-from python_zte_mc801a.lib.constants import lte_mask_to_bands, sort_bands_by_freq
+from python_zte_mc801a.lib.constants import band_label, lte_mask_to_bands, sort_bands_by_freq
 from python_zte_mc801a.lib.monitor_view import render
 from python_zte_mc801a.lib.reset import reset_lte_bands
 from python_zte_mc801a.lib.router_requests import (
@@ -71,7 +71,7 @@ def _fmt_pcell(info: dict) -> str:
     band = _digits_to_band(info.get("lte_ca_pcell_band"))
     if band is not None:
         bw = info.get("lte_ca_pcell_bandwidth", "")
-        return f"B{band} ({bw} MHz)" if bw else f"B{band}"
+        return f"{band_label(band)}  BW {bw} MHz" if bw else band_label(band)
     return info.get("wan_active_band", "") or ""
 
 
@@ -80,7 +80,7 @@ def _fmt_scells(info: dict) -> list:
     for seg in str(info.get("lte_multi_ca_scell_info", "") or "").rstrip(";").split(";"):
         parts = seg.split(",")
         if len(parts) >= 6:
-            out.append(f"B{parts[3]}  PCI {parts[1]}, EARFCN {parts[4]}, {parts[5]} MHz")
+            out.append(f"{band_label(int(parts[3]))}  PCI {parts[1]}, EARFCN {parts[4]}, BW {parts[5]} MHz")
     return out
 
 

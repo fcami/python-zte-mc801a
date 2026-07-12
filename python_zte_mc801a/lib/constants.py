@@ -20,6 +20,21 @@ def sort_bands_by_freq(bands: list) -> list:
     return sorted(bands, key=lambda b: (b not in LTE_BAND_DL_MHZ, LTE_BAND_DL_MHZ.get(b, b)))
 
 
+# LTE band -> nominal marketing frequency (MHz), e.g. "band 28 = 700 MHz".
+LTE_BAND_NOMINAL_MHZ = {
+    1: 2100, 3: 1800, 5: 850, 7: 2600, 8: 900, 20: 800, 28: 700, 32: 1500,
+    38: 2600, 40: 2300, 41: 2500, 42: 3500, 43: 3700,
+}
+
+
+def band_label(b) -> str:
+    """Human-readable band label: "B{n} {nominal}[{DL centre}]" when both
+    frequencies are known, else plain "B{n}"."""
+    if b in LTE_BAND_NOMINAL_MHZ and b in LTE_BAND_DL_MHZ:
+        return f"B{b} {LTE_BAND_NOMINAL_MHZ[b]}[{LTE_BAND_DL_MHZ[b]}]"
+    return f"B{b}"
+
+
 # LTE band bitmask: bit (N-1) represents band N.
 # Verified from router JS (goformId=SET_NETWORK_BAND_LOCK).
 def lte_bands_to_mask(bands: list) -> str:

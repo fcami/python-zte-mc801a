@@ -3,7 +3,7 @@ from python_zte_mc801a.monitor import _build_state, _fmt_pcell, _fmt_scells, anc
 
 
 def test_fmt_pcell_normal():
-    assert _fmt_pcell({"lte_ca_pcell_band": "28", "lte_ca_pcell_bandwidth": "10.0"}) == "B28 (10.0 MHz)"
+    assert _fmt_pcell({"lte_ca_pcell_band": "28", "lte_ca_pcell_bandwidth": "10.0"}) == "B28 700[780]  BW 10.0 MHz"
 
 
 def test_fmt_pcell_zero_falls_back_to_wan():
@@ -25,8 +25,8 @@ def test_anchor_band_none_when_absent():
 def test_fmt_scells_parses_segments():
     scells = _fmt_scells({"lte_multi_ca_scell_info": "1,85,1,7,3350,20;2,85,1,3,1675,15;"})
     assert len(scells) == 2
-    assert "B7" in scells[0] and "3350" in scells[0]
-    assert "B3" in scells[1]
+    assert scells[0] == "B7 2600[2655]  PCI 85, EARFCN 3350, BW 20 MHz"
+    assert scells[1] == "B3 1800[1842]  PCI 85, EARFCN 1675, BW 15 MHz"
 
 
 def test_build_state_maps_fields_and_lock():

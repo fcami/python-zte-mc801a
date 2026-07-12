@@ -15,9 +15,13 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from python_zte_mc801a.lib.constants import band_label, sort_bands_by_freq
+
 
 def _fmt_bands(bands) -> str:
-    return ", ".join(f"B{b}" for b in bands) if bands else "(none)"
+    if not bands:
+        return "(none)"
+    return " / ".join(band_label(b) for b in sort_bands_by_freq(bands))
 
 
 def _band_style(active, band_lock) -> str:
