@@ -2,14 +2,14 @@
 
 Python CLI and library for the ZTE MC801a / MC888 5G CPE router.
 
-![Python ZTE MC801a Live View](docs/images/live-view.png?raw=true "Live View")
-
 ## What is this?
 
 A command-line tool and Python library to manage the ZTE MC801A router.
 It can query signal data, lock LTE and 5G bands, lock to a specific cell,
 change network mode, configure DNS, and run a watchdog daemon to keep
 settings stable.
+
+This is a fork of [nicjac/python-zte-mc801a](https://github.com/nicjac/python-zte-mc801a).
 
 Original idea and inspiration from the JavaScript code by
 [Miononno](https://miononno.it/).
@@ -28,22 +28,23 @@ a factory reset. Use at your own risk.
 
 ## Features
 
-| Feature                    | Type  | CLI command        |
-| -------------------------- | ----- | ------------------ |
-| Comprehensive status       | READ  | `status`           |
-| Device version info        | READ  | `info`             |
-| Signal data (raw/processed)| READ  | `data`             |
-| LTE band lock state        | READ  | `lte-band-info`    |
-| Live dashboard             | READ  | `live`             |
-| Network mode switching     | WRITE | `set-mode`         |
-| LTE band locking           | WRITE | `lock-lte-bands`   |
-| 5G NR band locking         | WRITE | `lock-5g-bands`    |
-| Cell locking (PCI+EARFCN)  | WRITE | `lock-cell`        |
-| Cell lock removal          | WRITE | `unlock-cell`      |
-| DNS configuration          | WRITE | `set-dns`          |
-| Reboot                     | WRITE | `reboot`           |
-| 5G PCI forcing             | WRITE | `force-5g-pci`     |
-| Watchdog daemon             | WRITE | `watchdog`         |
+| Feature                    | Type       | CLI command        |
+| -------------------------- | ---------- | ------------------ |
+| Comprehensive status       | READ       | `status`           |
+| Device version info        | READ       | `info`             |
+| Signal data (raw/processed)| READ       | `data`             |
+| LTE band lock state        | READ       | `lte-band-info`    |
+| Live dashboard             | READ       | `live`             |
+| Live band monitor + reset  | READ/WRITE | `monitor`          |
+| Network mode switching     | WRITE      | `set-mode`         |
+| LTE band locking           | WRITE      | `lock-lte-bands`   |
+| 5G NR band locking         | WRITE      | `lock-5g-bands`    |
+| Cell locking (PCI+EARFCN)  | WRITE      | `lock-cell`        |
+| Cell lock removal          | WRITE      | `unlock-cell`      |
+| DNS configuration          | WRITE      | `set-dns`          |
+| Reboot                     | WRITE      | `reboot`           |
+| 5G PCI forcing             | WRITE      | `force-5g-pci`     |
+| Watchdog daemon             | WRITE      | `watchdog`         |
 
 ## Compatibility
 
@@ -54,14 +55,18 @@ a factory reset. Use at your own risk.
 
 ## Installation
 
+Not published to PyPI — install from GitHub:
+
 ```bash
-pip install python-zte-mc801a
+pip install git+https://github.com/fcami/python-zte-mc801a
 ```
 
-Or install directly from the repository:
+## Quick setup
 
 ```bash
-pip install git+https://github.com/nicjac/python-zte-mc801a
+python-zte-mc801a setup      # prompts for router IP + password → settings.yml
+python-zte-mc801a status     # verify: connection + active bands
+python-zte-mc801a monitor    # live band monitor (keys: r reset · b band set · p pause · q quit)
 ```
 
 ## Quick start
@@ -176,7 +181,11 @@ python-zte-mc801a live --viz power-5g     # 5G signal power graph
 python-zte-mc801a monitor
 ```
 
-Gives a once-per-second view of active bands and signal. Keys:
+Gives a once-per-second view of active bands and signal.
+
+**Reading `Active LTE`:** the modem reverts to a single band when idle (power-save / network deprioritization), so `Active LTE` reflects your full carrier aggregation only **under load** — watch it during a large download or a bandwidth test. At idle it typically shows just the anchor band.
+
+Keys:
 
 - `r` — reset now: collapse to the anchor band, then restore the selected target
 - `b` — cycle the reset target: full lock → drop highest-freq band → anchor + highest → anchor only
